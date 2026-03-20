@@ -583,18 +583,27 @@ async function doSignup() {
   const btn   = event.target;
   showError('signup-error', '');
   if (!name || !phone || !pass) { showError('signup-error', 'Please fill in all required fields.'); return; }
-  if (!/^\+?\d{7,15}$/.test(phone)) { showError('signup-error', 'Enter a valid mobile number (digits only, 7–15 chars).'); return; }
   if (pass.length < 6) { showError('signup-error', 'Password must be at least 6 characters.'); return; }
   const email = phoneToEmail(phone);
+  console.log('STEP 1: starting signup with', email);
   setBtnLoading(btn, true);
+
   const { data, error } = await sb.auth.signUp({ email, password: pass });
+  console.log('STEP 2: signUp result', JSON.stringify({data, error}));
   if (error) { setBtnLoading(btn, false, 'Create account'); showError('signup-error', error.message); return; }
-  if (!data?.user) { setBtnLoading(btn, false, 'Create account'); showError('signup-error', 'Signup failed — try again.'); return; }
-  const { error: pe } = await sb.from('profiles').insert({ id: data.user.id, role: signupRole, name, email, phone: phone || null });
+  if (!data?.user) { setBtnLoading(btn, false, 'Create account'); showError('signup-error', 'No user returned'); return; }
+
+  console.log('STEP 3: inserting profile for', data.user.id);
+  const { error: pe } = await sb.from('profiles').insert({
+    id: data.user.id, role: signupRole, name, email, phone: phone || null
+  });
+  console.log('STEP 4: profile insert result', JSON.stringify(pe));
   setBtnLoading(btn, false, 'Create account');
-  if (pe) { showError('signup-error', pe.message); return; }
+  if (pe) { showError('signup-error', 'Profile error: ' + pe.message); return; }
+
   currentUser = data.user;
-  currentProfile = { id: data.user.id, role: signupRole, name, email, phone: phone || null };
+  currentProfile = { id: data.user.id, role: signupRole, name, email, phone };
+  console.log('STEP 5: routing...');
   if (signupRole === 'parent') { showScreen('onboarding'); resetOb(); }
   else { loadDoctorDash(); }
 }
