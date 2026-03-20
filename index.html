@@ -580,7 +580,7 @@ function selRole(r) {
 }
 
 async function doSignup() {
-  isSigningUp = true; // ADD THIS
+  isSigningUp = true;
   const name  = document.getElementById('su-name').value.trim();
   let phone   = document.getElementById('su-phone').value.trim().replace(/\s+/g, '');
   const pass  = document.getElementById('su-pass').value;
@@ -598,7 +598,8 @@ async function doSignup() {
   if (!data?.user) { isSigningUp = false; setBtnLoading(btn, false, 'Create account'); showError('signup-error', 'No user returned'); return; }
 
   console.log('STEP 3: inserting profile for', data.user.id);
-  const { error: pe } = await sb.from('profiles').insert({
+  await new Promise(r => setTimeout(r, 1000));
+  const { error: pe } = await sb.from('profiles').upsert({
     id: data.user.id, role: signupRole, name, email, phone: phone || null
   });
   console.log('STEP 4: profile insert result', JSON.stringify(pe));
@@ -607,7 +608,7 @@ async function doSignup() {
 
   currentUser = data.user;
   currentProfile = { id: data.user.id, role: signupRole, name, email, phone };
-  isSigningUp = false; // ADD THIS before routing
+  isSigningUp = false;
   console.log('STEP 5: routing...');
   if (signupRole === 'parent') { showScreen('onboarding'); resetOb(); }
   else { loadDoctorDash(); }
