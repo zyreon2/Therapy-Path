@@ -200,8 +200,8 @@ textarea{resize:vertical;min-height:80px}
       </div>
       <div id="login-error"></div>
       <div class="form-group">
-        <label class="lbl">Email</label>
-        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email"/>
+        <label class="lbl">Mobile Number</label>
+        <input type="tel" id="login-phone" placeholder="9876543210" autocomplete="tel"/>
       </div>
       <div class="form-group">
         <label class="lbl">Password</label>
@@ -240,12 +240,9 @@ textarea{resize:vertical;min-height:80px}
         <input type="text" id="su-name" placeholder="Jane Doe"/>
       </div>
       <div class="form-group">
-        <label class="lbl">Email</label>
-        <input type="email" id="su-email" placeholder="you@example.com"/>
-      </div>
-      <div class="form-group">
-        <label class="lbl">Phone (optional — doctors: required for patient linking)</label>
-        <input type="tel" id="su-phone" placeholder="+91 98765 43210"/>
+        <label class="lbl">Mobile Number</label>
+        <input type="tel" id="su-phone" placeholder="9876543210"/>
+        <div style="font-size:11px;color:var(--ink3);margin-top:4px">Doctors: patients will find you using this number</div>
       </div>
       <div class="form-group">
         <label class="lbl">Password</label>
@@ -555,16 +552,20 @@ sb.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_OUT') { currentProfile = null; showScreen('login'); }
 });
 
+
+function phoneToEmail(phone) {
+  return phone.replace(/\D/g, '') + '@therapypath.app';
+}
 async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
+  let phone = document.getElementById('login-phone').value.trim().replace(/\s+/g, '');
   const pass  = document.getElementById('login-pass').value;
   const btn   = event.target;
   showError('login-error', '');
-  if (!email || !pass) { showError('login-error', 'Please enter email and password.'); return; }
+  if (!phone || !pass) { showError('login-error', 'Please enter mobile number and password.'); return; }
+  const email = phoneToEmail(phone);
   setBtnLoading(btn, true);
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
   if (error) { setBtnLoading(btn, false, 'Sign in'); showError('login-error', error.message); return; }
-  // routeByProfile called by onAuthStateChange
   setBtnLoading(btn, false, 'Sign in');
 }
 
@@ -577,13 +578,14 @@ function selRole(r) {
 
 async function doSignup() {
   const name  = document.getElementById('su-name').value.trim();
-  const email = document.getElementById('su-email').value.trim();
-  const phone = document.getElementById('su-phone').value.trim();
+  let phone   = document.getElementById('su-phone').value.trim().replace(/\s+/g, '');
   const pass  = document.getElementById('su-pass').value;
   const btn   = event.target;
   showError('signup-error', '');
-  if (!name || !email || !pass) { showError('signup-error', 'Please fill in all required fields.'); return; }
+  if (!name || !phone || !pass) { showError('signup-error', 'Please fill in all required fields.'); return; }
+  if (!/^\+?\d{7,15}$/.test(phone)) { showError('signup-error', 'Enter a valid mobile number (digits only, 7–15 chars).'); return; }
   if (pass.length < 6) { showError('signup-error', 'Password must be at least 6 characters.'); return; }
+  const email = phoneToEmail(phone);
   setBtnLoading(btn, true);
   const { data, error } = await sb.auth.signUp({ email, password: pass });
   if (error) { setBtnLoading(btn, false, 'Create account'); showError('signup-error', error.message); return; }
