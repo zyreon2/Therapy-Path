@@ -537,30 +537,35 @@ function requireSb() {
 }
 
 // ===== SUPABASE AUTH =====
-if (sb) sb.auth.onAuthStateChange(async (event, session) => {
-  currentUser = session?.user || null;
-  if (currentUser) {
-    const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+async function routeByProfile(userId) {
+  try {
+    const { data, error } = await sb.from('profiles').select('*').eq('id', userId).single();
+    if (error || !data) { showScreen('login'); return; }
     currentProfile = data;
-    if (currentProfile?.role === 'doctor') {
-      loadDoctorDash();
-    } else if (currentProfile?.role === 'parent') {
-      loadParentDash();
-    }
+    if (currentProfile.role === 'doctor') loadDoctorDash();
+    else loadParentDash();
+  } catch(e) { showScreen('login'); }
+}
+
+sb.auth.onAuthStateChange(async (event, session) => {
+  currentUser = session?.user || null;
+  if (currentUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+    await routeByProfile(currentUser.id);
   }
+  if (event === 'SIGNED_OUT') { currentProfile = null; showScreen('login'); }
 });
 
 async function doLogin() {
-  if (!requireSb()) return;
   const email = document.getElementById('login-email').value.trim();
   const pass  = document.getElementById('login-pass').value;
   const btn   = event.target;
   showError('login-error', '');
+  if (!email || !pass) { showError('login-error', 'Please enter email and password.'); return; }
   setBtnLoading(btn, true);
-  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { setBtnLoading(btn, false, 'Sign in'); showError('login-error', error.message); return; }
+  // routeByProfile called by onAuthStateChange
   setBtnLoading(btn, false, 'Sign in');
-  if (error) { showError('login-error', error.message); return; }
-  // onAuthStateChange handles redirect
 }
 
 let signupRole = 'parent';
@@ -571,7 +576,6 @@ function selRole(r) {
 }
 
 async function doSignup() {
-  if (!requireSb()) return;
   const name  = document.getElementById('su-name').value.trim();
   const email = document.getElementById('su-email').value.trim();
   const phone = document.getElementById('su-phone').value.trim();
@@ -579,19 +583,21 @@ async function doSignup() {
   const btn   = event.target;
   showError('signup-error', '');
   if (!name || !email || !pass) { showError('signup-error', 'Please fill in all required fields.'); return; }
-  if (pass.length < 6)          { showError('signup-error', 'Password must be at least 6 characters.'); return; }
+  if (pass.length < 6) { showError('signup-error', 'Password must be at least 6 characters.'); return; }
   setBtnLoading(btn, true);
   const { data, error } = await sb.auth.signUp({ email, password: pass });
   if (error) { setBtnLoading(btn, false, 'Create account'); showError('signup-error', error.message); return; }
+  if (!data?.user) { setBtnLoading(btn, false, 'Create account'); showError('signup-error', 'Signup failed — try again.'); return; }
   const { error: pe } = await sb.from('profiles').insert({ id: data.user.id, role: signupRole, name, email, phone: phone || null });
   setBtnLoading(btn, false, 'Create account');
   if (pe) { showError('signup-error', pe.message); return; }
-  // onAuthStateChange fires — will route to appropriate screen
+  currentUser = data.user;
+  currentProfile = { id: data.user.id, role: signupRole, name, email, phone: phone || null };
   if (signupRole === 'parent') { showScreen('onboarding'); resetOb(); }
+  else { loadDoctorDash(); }
 }
 
 async function doLogout() {
-  if (!requireSb()) return;
   await sb.auth.signOut();
   currentUser = null; currentProfile = null;
   showScreen('login');
