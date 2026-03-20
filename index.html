@@ -599,9 +599,13 @@ async function doSignup() {
 
   console.log('STEP 3: inserting profile for', data.user.id);
   await new Promise(r => setTimeout(r, 1000));
-  const { error: pe } = await sb.from('profiles').upsert({
-    id: data.user.id, role: signupRole, name, email, phone: phone || null
-  });
+ const { error: pe } = await sb.rpc('create_profile', {
+  user_id: data.user.id,
+  user_role: signupRole,
+  user_name: name,
+  user_email: email,
+  user_phone: phone || null
+});
   console.log('STEP 4: profile insert result', JSON.stringify(pe));
   setBtnLoading(btn, false, 'Create account');
   if (pe) { isSigningUp = false; showError('signup-error', 'Profile error: ' + pe.message); return; }
