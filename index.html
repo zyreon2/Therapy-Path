@@ -544,8 +544,11 @@ async function routeByProfile(userId) {
   } catch(e) { showScreen('login'); }
 }
 
+let isSigningUp = false;
+
 sb.auth.onAuthStateChange(async (event, session) => {
   currentUser = session?.user || null;
+  if (isSigningUp) return; // don't reroute during signup
   if (currentUser && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
     await routeByProfile(currentUser.id);
   }
@@ -577,21 +580,22 @@ function selRole(r) {
 }
 
 async function doSignup() {
+  isSigningUp = true; // ADD THIS
   const name  = document.getElementById('su-name').value.trim();
   let phone   = document.getElementById('su-phone').value.trim().replace(/\s+/g, '');
   const pass  = document.getElementById('su-pass').value;
   const btn   = event.target;
   showError('signup-error', '');
-  if (!name || !phone || !pass) { showError('signup-error', 'Please fill in all required fields.'); return; }
-  if (pass.length < 6) { showError('signup-error', 'Password must be at least 6 characters.'); return; }
+  if (!name || !phone || !pass) { isSigningUp = false; showError('signup-error', 'Please fill in all required fields.'); return; }
+  if (pass.length < 6) { isSigningUp = false; showError('signup-error', 'Password must be at least 6 characters.'); return; }
   const email = phoneToEmail(phone);
   console.log('STEP 1: starting signup with', email);
   setBtnLoading(btn, true);
 
   const { data, error } = await sb.auth.signUp({ email, password: pass });
   console.log('STEP 2: signUp result', JSON.stringify({data, error}));
-  if (error) { setBtnLoading(btn, false, 'Create account'); showError('signup-error', error.message); return; }
-  if (!data?.user) { setBtnLoading(btn, false, 'Create account'); showError('signup-error', 'No user returned'); return; }
+  if (error) { isSigningUp = false; setBtnLoading(btn, false, 'Create account'); showError('signup-error', error.message); return; }
+  if (!data?.user) { isSigningUp = false; setBtnLoading(btn, false, 'Create account'); showError('signup-error', 'No user returned'); return; }
 
   console.log('STEP 3: inserting profile for', data.user.id);
   const { error: pe } = await sb.from('profiles').insert({
@@ -599,10 +603,11 @@ async function doSignup() {
   });
   console.log('STEP 4: profile insert result', JSON.stringify(pe));
   setBtnLoading(btn, false, 'Create account');
-  if (pe) { showError('signup-error', 'Profile error: ' + pe.message); return; }
+  if (pe) { isSigningUp = false; showError('signup-error', 'Profile error: ' + pe.message); return; }
 
   currentUser = data.user;
   currentProfile = { id: data.user.id, role: signupRole, name, email, phone };
+  isSigningUp = false; // ADD THIS before routing
   console.log('STEP 5: routing...');
   if (signupRole === 'parent') { showScreen('onboarding'); resetOb(); }
   else { loadDoctorDash(); }
